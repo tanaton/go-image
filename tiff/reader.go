@@ -5,12 +5,14 @@
 // Package tiff implements a TIFF image decoder and encoder.
 //
 // The TIFF specification is at http://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf
-package tiff // import "golang.org/x/image/tiff"
+package tiff
 
 import (
+	"bufio"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
+	"github.com/pascaldekloe/got.6/image/fax"
 	"image"
 	"image/color"
 	"io"
@@ -636,7 +638,8 @@ func Decode(r io.Reader) (img image.Image, err error) {
 			}
 			offset := int64(blockOffsets[j*blocksAcross+i])
 			n := int64(blockCounts[j*blocksAcross+i])
-			switch d.firstVal(tCompression) {
+			tc := d.firstVal(tCompression)
+			switch tc {
 
 			// According to the spec, Compression does not have a default value,
 			// but some tools interpret a missing Compression value as none so we do
@@ -662,6 +665,7 @@ func Decode(r io.Reader) (img image.Image, err error) {
 				r.Close()
 			case cPackBits:
 				d.buf, err = unpackBits(io.NewSectionReader(d.r, offset, n))
+			case cG4:
 			default:
 				err = UnsupportedError(fmt.Sprintf("compression value %d", d.firstVal(tCompression)))
 			}
@@ -669,11 +673,16 @@ func Decode(r io.Reader) (img image.Image, err error) {
 				return nil, err
 			}
 
-			xmin := i * blockWidth
-			ymin := j * blockHeight
-			xmax := xmin + blkW
-			ymax := ymin + blkH
-			err = d.decode(img, xmin, ymin, xmax, ymax)
+			switch tc {
+			case cG4:
+				img, err = fax.DecodeG4(bufio.NewReader(io.NewSectionReader(d.r, offset, n)), blockWidth, blockHeight)
+			default:
+				xmin := i * blockWidth
+				ymin := j * blockHeight
+				xmax := xmin + blkW
+				ymax := ymin + blkH
+				err = d.decode(img, xmin, ymin, xmax, ymax)
+			}
 			if err != nil {
 				return nil, err
 			}
