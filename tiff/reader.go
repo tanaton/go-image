@@ -666,6 +666,7 @@ func Decode(r io.Reader) (img image.Image, err error) {
 			case cPackBits:
 				d.buf, err = unpackBits(io.NewSectionReader(d.r, offset, n))
 			case cG4:
+				// skip
 			default:
 				err = UnsupportedError(fmt.Sprintf("compression value %d", d.firstVal(tCompression)))
 			}
